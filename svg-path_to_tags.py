@@ -41,9 +41,7 @@ class Cmd:
     
     def __str__(self):
         return self.id + ": " + str.join(", ", [str(arg) for arg in self._args])
-    
 
-        
 
 class XmlCmd:
     def __init__(self, cmd, pos):
@@ -58,13 +56,6 @@ class XmlCmd:
     def cmd(self):
         return self._cmd
         
-    _CLASS_ASSOCIATIONS = {
-        CmdMove:    XmlCmdMove,
-        CmdMoveTo:  XmlCmdMoveTo,
-        CmdLine:    XmlCmdLine,
-        CmdLineTo:  XmlCmdLineTo
-    }
-    
     @staticmethod
     def create_for(cmd, pos):
         toret = XmlCmd._CLASS_ASSOCIATIONS.get(cmd.__class__)
@@ -84,7 +75,7 @@ class CmdMove(Cmd):
 
 class XmlCmdMove(XmlCmd):
     def __init__(self, cmd, pos):
-        super().__init__(cmd)
+        super().__init__(cmd, pos)
         
     def generate(self):
         self._pos[0] = self._cmd.args[0]
@@ -105,7 +96,7 @@ class CmdMoveTo(Cmd):
         
 class XmlCmdMoveTo(XmlCmd):
     def __init__(self, cmd, pos):
-        super().__init__(cmd)
+        super().__init__(cmd, pos)
         
     def generate(self):
         self._pos[0] += self._cmd.args[0]
@@ -126,39 +117,41 @@ class CmdLine(Cmd):
 
 class XmlCmdLine(XmlCmd):
     def __init__(self, cmd, pos):
-        super().__init__(cmd)
+        super().__init__(cmd, pos)
         
     def generate(self):
-        self.org = list(self._pos)
+        self._org = list(self._pos)
         self._pos[0] = self._cmd.args[0]
         self._pos[1] = self._cmd.args[1]
+        self._end = list(self._pos)
         
         return self._pos
         
     def __str__(self):
-        return ("<line x1=\"" + self.org[0]
-                    + "\" y1=\"" + self.org[1]
-                    + "\" y1=\"" + self._pos[0]
-                    + "\" y2=\"" + self._pos[1]
+        return ("<line x1=\"" + str(self._org[0])
+                    + "\" y1=\"" + str(self._org[1])
+                    + "\" x2=\"" + str(self._end[0])
+                    + "\" y2=\"" + str(self._end[1])
                     + "\"/>")
     
 
 class XmlCmdLineTo(XmlCmd):
     def __init__(self, cmd, pos):
-        super().__init__(cmd)
+        super().__init__(cmd, pos)
         
     def generate(self):
-        self.org = list(self._pos)
+        self._org = list(self._pos)
         self._pos[0] += self._cmd.args[0]
         self._pos[1] += self._cmd.args[1]
+        self._end = list(self.pos)
         
         return self._pos
         
     def __str__(self):
-        return ("<line x1=\"" + self.org[0]
-                    + "\" y1=\"" + self.org[1]
-                    + "\" y1=\"" + self._pos[0]
-                    + "\" y2=\"" + self._pos[1]
+        return ("<line x1=\"" + str(self._org[0])
+                    + "\" y1=\"" + str(self._org[1])
+                    + "\" x2=\"" + str(self._end[0])
+                    + "\" y2=\"" + str(self._end[1])
                     + "\"/>")        
 
 
@@ -182,6 +175,13 @@ class Parser:
     def parse(self):
         i = 0
         toret = SVG()
+        
+        XmlCmd._CLASS_ASSOCIATIONS = {
+            CmdMove:    XmlCmdMove,
+            CmdMoveTo:  XmlCmdMoveTo,
+            CmdLine:    XmlCmdLine,
+            CmdLineTo:  XmlCmdLineTo
+        }
         
         while i < len(self._str_path):
             ch = self._str_path[i]
@@ -221,14 +221,17 @@ class Parser:
             arg = '-'
             pos += 1
         
-        while pos < len(self._str_path) and self._str_path[pos].isdigit():
+        while (pos < len(self._str_path)
+           and (self._str_path[pos].isdigit()
+             or self._str_path[pos] == '.')):
             arg += self._str_path[pos]
             pos += 1
             
-        return (pos, arg)
+        return (pos, float(arg))
     
     def skip_spaces(self, pos):
-        while pos < len(self._str_path) and self._str_path[pos] == ' ':
+        while (pos < len(self._str_path)
+           and self._str_path[pos] in [' ', ',']):
             pos += 1
             
         return pos
@@ -250,8 +253,8 @@ class XMLSVG:
         return toret
         
     def __str__(self):
-        return str.join('\n', [str(cmd) in self.generate()])
+        return str.join('\n', [str(cmd) for cmd in self.generate()])
 
 
 if __name__ == "__main__":
-    print(str(XMLSVG(Parser("M111 222 L 333 444 l555 -666").parse())))
+    print(str(XMLSVG(Parser(input()).parse())))
